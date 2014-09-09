@@ -16,7 +16,7 @@ tagtest:	$(TAGTEST_OBJS)
 	$(CC) -o $@ $(TAGTEST_OBJS) -lm -lpthread
 
 clean:
-	rm -f $(ODIR)/*.o *~ tagtest cachegrind.out* callgrind.out* gmon.out
+	rm -f $(ODIR)/*.o *~ *.o *.pnm tagtest cachegrind.out* callgrind.out* gmon.out
 
 save-obj:
 	mv *.o $(ODIR)

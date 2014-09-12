@@ -48,7 +48,7 @@ image_u32_t *image_u32_create_from_u8(image_u8_t *in)
     image_u32_t *out = image_u32_create(in->width, in->height);
 
     for (int y = 0; y < in->height; y++) {
-        for (int x = 0; x < in->width; x++) {
+        for (int x = 0; x < in->w idth; x++) {
             uint32_t v = in->buf[in->stride*y+x];
             v = (v<<16) | (v<<8) | v;
             out->buf[out->stride*y+x] = v;

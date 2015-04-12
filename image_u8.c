@@ -1,209 +1,147 @@
-/*
- * This file is part of the AprilTag library.
- *
- * AprilTag is free software; you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation; either version 2.1 of
- * the License, or (at your option) any later version.
- *
- * AprilTag is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with Libav; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301 USA
+/* (C) 2013-2014, The Regents of The University of Michigan
+All rights reserved.
+
+This software may be available under alternative licensing
+terms. Contact Edwin Olson, ebolson@umich.edu, for more information.
+
+   Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation are those
+of the authors and should not be interpreted as representing official policies,
+either expressed or implied, of the FreeBSD Project.
  */
 
-#include <stdlib.h>
+#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include <assert.h>
+
 #include "image_u8.h"
-#include "common.h"
+#include "pnm.h"
 
-#define ALIGNMENT 64
+// least common multiple of 64 (sandy bridge cache line) and 24 (stride
+// needed for RGB in 8-wide vector processing)
+#define DEFAULT_ALIGNMENT 96
 
-image_u8_t *image_u8_create(int width, int height)
+static inline double sq(double v)
 {
-    image_u8_t *im = (image_u8_t*) calloc(1, sizeof(image_u8_t));
+    return v*v;
+}
 
-    im->width = width;
-    im->height = height;
-    im->stride = width;
+static int iclamp(int v, int min, int max)
+{
+    if (v < min)
+        return min;
+    if (v > max)
+        return max;
+    return v;
+}
 
-    if ((im->stride % ALIGNMENT) != 0)
-        im->stride += ALIGNMENT - (im->stride % ALIGNMENT);
+image_u8_t *image_u8_create(unsigned int width, unsigned int height)
+{
+    return image_u8_create_alignment(width, height, DEFAULT_ALIGNMENT);
+}
 
-    im->buf = (uint8_t*) calloc(1, im->height*im->stride);
+image_u8_t *image_u8_create_alignment(unsigned int width, unsigned int height, unsigned int alignment)
+{
+    int stride = width;
 
+    if ((stride % alignment) != 0)
+        stride += alignment - (stride % alignment);
+
+    uint8_t *buf = calloc(height*stride, sizeof(uint8_t));
+
+    // const initializer
+    image_u8_t tmp = { .width = width, .height = height, .stride = stride, .buf = buf };
+
+    image_u8_t *im = calloc(1, sizeof(image_u8_t));
+    memcpy(im, &tmp, sizeof(image_u8_t));
     return im;
 }
 
-image_u8_t *image_u8_copy(const image_u8_t *src)
+image_u8_t *image_u8_copy(const image_u8_t *in)
 {
-    image_u8_t *im = (image_u8_t*) calloc(1, sizeof(image_u8_t));
+    uint8_t *buf = malloc(in->height*in->stride*sizeof(uint8_t));
+    memcpy(buf, in->buf, in->height*in->stride*sizeof(uint8_t));
 
-    im->width = src->width;
-    im->height = src->height;
-    im->stride = src->stride;
+    // const initializer
+    image_u8_t tmp = { .width = in->width, .height = in->height, .stride = in->stride, .buf = buf };
 
-    im->buf = (uint8_t*) calloc(1, im->height*im->stride);
-
-    memcpy(im->buf, src->buf, im->height*im->stride);
-    return im;
+    image_u8_t *copy = calloc(1, sizeof(image_u8_t));
+    memcpy(copy, &tmp, sizeof(image_u8_t));
+    return copy;
 }
 
 void image_u8_destroy(image_u8_t *im)
 {
-    if (im == NULL)
+    if (!im)
         return;
 
     free(im->buf);
     free(im);
 }
 
-void image_u8_clear(image_u8_t *im)
-{
-    memset(im->buf, 0, im->height*im->stride);
-}
+////////////////////////////////////////////////////////////
+// PNM file i/o
 
 image_u8_t *image_u8_create_from_pnm(const char *path)
 {
-    int width, height, format = -1;
-
-    FILE *f = fopen(path, "rb");
-    if (f == NULL)
+    pnm_t *pnm = pnm_create_from_file(path);
+    if (pnm == NULL)
         return NULL;
 
     image_u8_t *im = NULL;
 
-    char tmp[1024];
-    int nparams = 0; // will be 3 when we're all done.
-    int params[3];
+    switch (pnm->format) {
+        case PNM_FORMAT_GRAY: {
+            im = image_u8_create(pnm->width, pnm->height);
 
-    while (nparams < 3) {
-        if (fgets(tmp, sizeof(tmp), f) == NULL)
-            goto error;
+            for (int y = 0; y < im->height; y++)
+                memcpy(&im->buf[y*im->stride], &pnm->buf[y*im->width], im->width);
 
-        // skip comments
-        if (tmp[0]=='#')
-            continue;
-
-        char *p = tmp;
-
-        if (format == -1 && tmp[0]=='P') {
-            format = tmp[1]-'0';
-            assert(format==5 || format==6);
-            p = &tmp[2];
+            break;
         }
 
-        // pull integers out of this line until there are no more.
-        while (nparams < 3 && *p!=0) {
-            while (*p==' ')
-                p++;
+        case PNM_FORMAT_RGB: {
+            im = image_u8_create(pnm->width, pnm->height);
 
-            // encounter rubbish? (End of line?)
-            if (*p < '0' || *p > '9')
-                break;
-
-            int acc = 0;
-            while (*p >= '0' && *p <= '9') {
-                acc = acc*10 + *p - '0';
-                p++;
-            }
-
-            params[nparams++] = acc;
-            p++;
-        }
-    }
-
-    width = params[0];
-    height = params[1];
-	printf("nparams = %d\n", nparams);
-	printf("params[0] = %d\n", params[0]);
-	printf("params[1] = %d\n", params[1]);
-	printf("params[2] = %d\n", params[2]);
-//    assert(params[2] == 255);
-
-//    if (3 != fscanf(f, "P%d\n%d %d\n255\n", &format, &width, &height))
-//        goto error;
-
-    im = image_u8_create(width, height);
-
-    switch (format) {
-        case 5: {
-            for (int y = 0; y < im->height; y++) {
-                size_t len = fread(&im->buf[y*im->stride], 1, im->width, f);
-                if (len != im->width)
-                    goto error;
-            }
-
-            fclose (f);
-            return im;
-        }
-
-        case 6: {
-            int stride = width*3;
-            int sz = stride*height;
-
-            uint8_t *rgb = malloc(sz);
-
-            if (sz != fread(rgb, 1, sz, f))
-                goto error;
-
-            fclose(f);
-
+            // Gray conversion for RGB is gray = (r + g + g + b)/4
             for (int y = 0; y < im->height; y++) {
                 for (int x = 0; x < im->width; x++) {
-                    int r = rgb[y*stride + 3*x + 0];
-                    int g = rgb[y*stride + 3*x + 1];
-                    int b = rgb[y*stride + 3*x + 2];
-
-                    int gray = (int) (0.3*r + 0.59*g + 0.11*b); // XXX not gamma correct
-                    if (gray > 255)
-                        gray = 255;
+                    uint8_t gray = (pnm->buf[y*im->width*3 + 3*x+0] +    // r
+                                    pnm->buf[y*im->width*3 + 3*x+1] +    // g
+                                    pnm->buf[y*im->width*3 + 3*x+1] +    // g
+                                    pnm->buf[y*im->width*3 + 3*x+2])     // b
+                        / 4;
 
                     im->buf[y*im->stride + x] = gray;
                 }
             }
 
-            free(rgb);
-
-            return im;
+            break;
         }
     }
 
-  error:
-    fclose(f);
-
-    if (im != NULL)
-        image_u8_destroy(im);
-
-    return NULL;
-}
-
-image_u8_t *image_u8_create_from_rgb3(int width, int height, uint8_t *rgb, int stride)
-{
-    image_u8_t *im = image_u8_create(width, height);
-
-    for (int y = 0; y < im->height; y++) {
-        for (int x = 0; x < im->width; x++) {
-            int r = rgb[y*stride + 3*x + 0];
-            int g = rgb[y*stride + 3*x + 0];
-            int b = rgb[y*stride + 3*x + 0];
-
-            int gray = (int) (0.6*g + 0.3*r + 0.1*b);
-            if (gray > 255)
-                gray = 255;
-
-            im->buf[y*im->stride + x] = gray;
-        }
-    }
-
+    pnm_destroy(pnm);
     return im;
 }
 
@@ -222,7 +160,7 @@ image_u8_t *image_u8_create_from_f32(image_f32_t *fim)
 }
 
 
-int image_u8_write_pgm(const image_u8_t *im, const char *path)
+int image_u8_write_pnm(const image_u8_t *im, const char *path)
 {
     FILE *f = fopen(path, "wb");
     int res = 0;
@@ -232,6 +170,7 @@ int image_u8_write_pgm(const image_u8_t *im, const char *path)
         goto finish;
     }
 
+    // Only outputs to grayscale
     fprintf(f, "P5\n%d %d\n255\n", im->width, im->height);
 
     for (int y = 0; y < im->height; y++) {
@@ -241,7 +180,7 @@ int image_u8_write_pgm(const image_u8_t *im, const char *path)
         }
     }
 
-  finish:
+finish:
     if (f != NULL)
         fclose(f);
 
@@ -258,8 +197,10 @@ void image_u8_draw_circle(image_u8_t *im, float x0, float y0, float r, int v)
             if (d > r)
                 continue;
 
-            int idx = y*im->stride + x;
-            im->buf[idx] = v;
+            if (x >= 0 && x < im->width && y >= 0 && y < im->height) {
+                int idx = y*im->stride + x;
+                im->buf[idx] = v;
+            }
         }
     }
 }
@@ -660,4 +601,60 @@ image_u8_t *image_u8_decimate(image_u8_t *im, float ffactor)
     }
 
     return decim;
+}
+
+void image_u8_fill_line_max(image_u8_t *im, const image_u8_lut_t *lut, const float *xy0, const float *xy1)
+{
+    // what is the maximum distance that will result in drawing into our LUT?
+    float max_dist2 = (lut->nvalues-1)/lut->scale;
+    float max_dist = sqrt(max_dist2);
+
+    // the orientation of the line
+    double theta = atan2(xy1[1]-xy0[1], xy1[0]-xy0[0]);
+    double v = sin(theta), u = cos(theta);
+
+    int ix0 = iclamp(fmin(xy0[0], xy1[0]) - max_dist, 0, im->width-1);
+    int ix1 = iclamp(fmax(xy0[0], xy1[0]) + max_dist, 0, im->width-1);
+
+    int iy0 = iclamp(fmin(xy0[1], xy1[1]) - max_dist, 0, im->height-1);
+    int iy1 = iclamp(fmax(xy0[1], xy1[1]) + max_dist, 0, im->height-1);
+
+    // the line segment xy0---xy1 can be parameterized in terms of line coordinates.
+    // We fix xy0 to be at line coordinate 0.
+    float xy1_line_coord = (xy1[0]-xy0[0])*u + (xy1[1]-xy0[1])*v;
+
+    float min_line_coord = fmin(0, xy1_line_coord);
+    float max_line_coord = fmax(0, xy1_line_coord);
+
+    for (int iy = iy0; iy <= iy1; iy++) {
+        float y = iy+.5;
+
+        for (int ix = ix0; ix <= ix1; ix++) {
+            float x = ix+.5;
+
+            // compute line coordinate of this pixel.
+            float line_coord = (x - xy0[0])*u + (y - xy0[1])*v;
+
+            // find point on line segment closest to our current pixel.
+            if (line_coord < min_line_coord)
+                line_coord = min_line_coord;
+            else if (line_coord > max_line_coord)
+                line_coord = max_line_coord;
+
+            float px = xy0[0] + line_coord*u;
+            float py = xy0[1] + line_coord*v;
+
+            double dist2 = (x-px)*(x-px) + (y-py)*(y-py);
+
+            // not in our LUT?
+            int idx = dist2 * lut->scale;
+            if (idx >= lut->nvalues)
+                continue;
+
+            uint8_t lut_value = lut->values[idx];
+            uint8_t old_value = im->buf[iy*im->stride + ix];
+            if (lut_value > old_value)
+                im->buf[iy*im->stride + ix] = lut_value;
+        }
+    }
 }

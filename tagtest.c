@@ -80,7 +80,18 @@ int main(int argc, char *argv[])
             char *path;
             zarray_get(inputs, input, &path);
             printf("loading %s\n", path);
+          
+          
+            /**
+             * 1. At this location we should change path to the pnm_t * object
+             *
+             * 2. Alter in common/image_u8.c
+             *
+             * 3. Then, input the opencv code to read constately. Perhaps, export to a
+             *    seperate function.
+             **/
             image_u8_t *im = image_u8_create_from_pnm(path);
+          
             if (im == NULL) {
                 printf("couldn't find %s\n", path);
                 continue;

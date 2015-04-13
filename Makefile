@@ -1,22 +1,27 @@
-CC=gcc -pthread -g -std=gnu99 -Wall -Wno-unused-parameter -Wno-format-zero-length -O4
+CC = gcc
+AR = ar
 
-# For most x86_64 platforms this will be a bit faster.
-#
-# CC += -msse4.2
+CFLAGS = -std=gnu99 -Wall -Wno-unused-parameter -Wno-unused-function -pthread -I. -Icommon -O1
+LDFLAGS = -lpthread -lm
+
+APRILTAG_OBJS = apriltag.o apriltag_quad_thresh.o tag16h5.o tag25h7.o tag25h9.o tag36h10.o tag36h11.o tag36artoolkit.o g2d.o common/zarray.o common/zhash.o common/zmaxheap.o common/unionfind.o common/matd.o common/image_u8.o common/pnm.o common/image_f32.o common/image_u32.o common/workerpool.o common/time_util.o common/svd22.o common/homography.o common/string_util.o common/getopt.o
+
+LIBAPRILTAG := libapriltag.a
+
+all: $(LIBAPRILTAG) apriltag_demo
 
 
-TAGTEST_OBJS = apriltag.o tagtest.o image_f32.o image_u8.o image_u32.o unionfind.o zhash.o zarray.o matd.o homography.o graymodel.o tag36h11.o tag36h10.o segment2.o workerpool.o g2d.o
+$(LIBAPRILTAG): $(APRILTAG_OBJS)
+	@echo "   [$@]"
+	@$(AR) -cq $@ $(APRILTAG_OBJS)
 
-ODIR = obj
+apriltag_demo: apriltag_demo.o
+	@echo "   [$@]"
+	@$(CC) -o $@ apriltag_demo.o $(APRILTAG_OBJS) $(LDFLAGS)
 
-all: tagtest
-
-
-tagtest:	$(TAGTEST_OBJS)
-	$(CC) -o $@ $(TAGTEST_OBJS) -lm -lpthread
+%.o: %.c
+	@echo "   $@"
+	@$(CC) -o $@ -c $< $(CFLAGS)
 
 clean:
-	rm -f $(ODIR)/*.o *~ *.o *.pnm tagtest cachegrind.out* callgrind.out* gmon.out
-
-save-obj:
-	mv *.o $(ODIR)
+	@rm -rf *.o common/*.o $(LIBAPRILTAG) apriltag_demo

@@ -13,6 +13,8 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#define CV_LOAD_IMAGE_COLOR 1
+
 /* version 2.4 of openCV */
 using namespace cv;
 

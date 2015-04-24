@@ -7,6 +7,11 @@ Since it was released under the GNU license, I am going to (hopefully) provide s
 
 I also intend to provide some *good* documentation, since there is next to none.
 
+To Build:  
+1. `lettergrams-apriltags $ make`  
+2. `mkdir build && cd build`  
+3. `cmake .. && make`  
+
 To Invoke: $ ./tagtest [options] input_image.pnm
 Options: 
 	 -d: Debug, displays image at every step

@@ -183,24 +183,38 @@ Mat gradientEdges(Mat &img){
 
 int main(int argc, const char* argv[]){
   
-  clock_t t;
-  t = clock();
-  Mat imgLab =  RGB2LAB(imread(argv[1], CV_LOAD_IMAGE_COLOR));
-  t = clock() - t;
-  double time_taken = ((double)t)/CLOCKS_PER_SEC;
-  std::cout << "time to convert: " << time_taken << std::endl;
+  VideoCapture cap(0); // open the default camera
+  if(!cap.isOpened())  // check if camera opened
+    return -1;
   
   char filename[60];
+  Mat a, b, g, frame;
   
-  Mat a = alphaLAB(imgLab);
-  Mat b = betaLAB(imgLab);
+  while(1){
   
-  t = clock();
-  Mat g = gradientEdges(a);
-  t = clock() - t;
-  time_taken = ((double)t)/CLOCKS_PER_SEC;
-  std::cout << "time to find gradient: " << time_taken << std::endl;
+    clock_t t;
+    t = clock();
   
+    cap >> frame; // get a new frame from camera
+    Mat imgLab =  RGB2LAB(frame);
+    t = clock() - t;
+    double time_taken = ((double)t)/CLOCKS_PER_SEC;
+    std::cout << "time to convert: " << time_taken << std::endl;
+  
+    a = alphaLAB(imgLab);
+    b = betaLAB(imgLab);
+  
+    t = clock();
+    g = gradientEdges(a);
+    t = clock() - t;
+    time_taken = ((double)t)/CLOCKS_PER_SEC;
+    std::cout << "time to find gradient: " << time_taken << std::endl;
+    
+    imshow("edges", g);
+    
+    if(waitKey(30) >= 0) break;
+  
+  }
 
   //sprintf(filename, "output/%s-rgb_2_lab.jpg", argv[1]);
   //imwrite(filename, imgLab);
@@ -210,5 +224,6 @@ int main(int argc, const char* argv[]){
   imwrite(filename, b);
   sprintf(filename, "output/%s-gradeintLab.pnm", argv[1]);
   imwrite(filename, g);
+  
   return 0;
 }

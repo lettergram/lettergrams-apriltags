@@ -39,8 +39,9 @@ pnm_t *mat2pnm(Mat *mat) {
        return 0;
 
    uchar *buf = (uchar *) malloc(buflen);
-   for (int i = 0; i < buflen; i++)
-       buf[i] = orig_data[i];
+   if (!buf)
+       return 0;
+   memcpy(buf, orig_data, buflen);
 
    pnm->width = width;
    pnm->height = height;

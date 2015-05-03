@@ -2,7 +2,9 @@
 #include <opencv/cv.h>
 #include <opencv2/opencv.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 #include "common/pnm.h"
+#include "common/image_u8.h"
 
 using namespace std;
 using namespace cv;
@@ -49,6 +51,47 @@ pnm_t *mat2pnm(Mat *mat) {
    pnm->buflen = buflen;
    pnm->format = format;
    return pnm;
+}
+
+image_u8_t * pnm_to_image_u8(pnm_t * pnm){
+  
+  if (pnm == NULL)
+    return NULL;
+  
+  image_u8_t *im = NULL;
+  
+  switch (pnm->format) {
+    case PNM_FORMAT_GRAY: {
+      im = image_u8_create(pnm->width, pnm->height);
+      
+      for (int y = 0; y < im->height; y++)
+        memcpy(&im->buf[y*im->stride], &pnm->buf[y*im->width], im->width);
+      
+      break;
+    }
+      
+    case PNM_FORMAT_RGB: {
+      im = image_u8_create(pnm->width, pnm->height);
+      
+      // Gray conversion for RGB is gray = (r + g + g + b)/4
+      for (int y = 0; y < im->height; y++) {
+        for (int x = 0; x < im->width; x++) {
+          uint8_t gray = (pnm->buf[y*im->width*3 + 3*x+0] +    // r
+                          pnm->buf[y*im->width*3 + 3*x+1] +    // g
+                          pnm->buf[y*im->width*3 + 3*x+1] +    // g
+                          pnm->buf[y*im->width*3 + 3*x+2])     // b
+          / 4;
+          
+          im->buf[y*im->stride + x] = gray;
+        }
+      }
+      
+      break;
+    }
+  }
+  
+  pnm_destroy(pnm);
+  return im;
 }
 
 void showpnm() {

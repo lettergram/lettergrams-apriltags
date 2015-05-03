@@ -145,6 +145,7 @@ image_u8_t *image_u8_create_from_pnm(const char *path)
     return im;
 }
 
+
 image_u8_t *image_u8_create_from_f32(image_f32_t *fim)
 {
     image_u8_t *im = image_u8_create(fim->width, fim->height);

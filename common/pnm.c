@@ -123,6 +123,7 @@ error:
     return NULL;
 }
 
+
 void pnm_destroy(pnm_t *pnm)
 {
     if (pnm == NULL)

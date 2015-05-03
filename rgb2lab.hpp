@@ -111,8 +111,8 @@ Mat RGB2LAB(Mat const &imgRGB){
 Mat alphaLAB(Mat const &imgLab){
 
   //Mat alphaLab(imgLab.size().height, imgLab.size().width, CV_8UC3); // may not work
-  Mat alphaLab;
-  cvtColor(imgLab, alphaLab, CV_Lab2RGB);
+  Mat alphaLab(imgLab);
+  //cvtColor(imgLab, alphaLab, CV_Lab2RGB);
   Size s = alphaLab.size();
 
   int steps = imgLab.step;
@@ -134,8 +134,8 @@ Mat alphaLAB(Mat const &imgLab){
  * to be saved out to file or manipulated
  **/
 Mat betaLAB(Mat &imgLab){
-  Mat betaLab;
-  cvtColor(imgLab, betaLab, CV_Lab2RGB);
+  Mat betaLab(imgLab);
+  //cvtColor(imgLab, betaLab, CV_Lab2RGB);
   Size s = betaLab.size();
   int steps = imgLab.step;
   int channels = imgLab.channels();
@@ -179,6 +179,16 @@ Mat gradientEdges(Mat &img){
   
   return gradImg;
   
+}
+
+/**
+ * Takes in a RGB image and outputs
+ * a Lab space image, only in the a channel
+ **/
+Mat RGB2LAB_a(Mat const &imgRGB){
+  Mat imgLab;
+  cvtColor(imgRGB, imgLab, CV_BGR2Lab);
+  return alphaLAB(imgLab);
 }
 
 /** 

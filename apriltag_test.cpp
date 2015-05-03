@@ -81,6 +81,12 @@ int main(){
   td->refine_decode = 0;                                    // Don't refine decode
   td->refine_pose = 0;                                      // Don't refine pose
   
+  // Output variables
+  char imgSize[20];
+  char renderTime[20];
+  char detect[50];
+  char displayString[50];
+  
   /* End of apriltag_demo.c */
   
   while(1){
@@ -89,6 +95,7 @@ int main(){
     t = clock();
     
     cap >> frame;                                             // Get a new frame from camera
+
     pnm_t *pnm = mat2pnm(&frame);                             // Convert Mat fram to pnm
     image_u8_t *im = pnm_to_image_u8(pnm);                    // Convert pnm to gray image_u8
     if (im == NULL) {                                         // Error - no image created from pnm
@@ -97,9 +104,8 @@ int main(){
     }
     
     /*** Start from origional Apriltags from apriltag_demo.c ***/
-    
+
     int hamm_hist[hamm_hist_max];
-    char detect[50];
     memset(hamm_hist, 0, sizeof(hamm_hist));
     zarray_t *detections = apriltag_detector_detect(td, im);
     
@@ -108,7 +114,7 @@ int main(){
       apriltag_detection_t *det;
       zarray_get(detections, i, &det);
       
-      sprintf(detect, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\r",
+      sprintf(detect, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\n",
                i+1, det->family->d*det->family->d, det->family->h, det->id, det->hamming, det->goodness, det->decision_margin);
 
       hamm_hist[det->hamming]++;
@@ -122,10 +128,7 @@ int main(){
     
     zarray_destroy(detections);
     image_u8_destroy(im);
-    
-    char displayString[50];
-    
-    
+
     t = clock() - t;
     double time_taken = ((double)t)/(CLOCKS_PER_SEC/1000);
     //printf("ms to render: %5.3f\n", time_taken);
@@ -139,11 +142,9 @@ int main(){
     //for (int i = 0; i < hamm_hist_max; i++)
       //printf("%5d", hamm_hist[i]);
     
-    char imgSize[20];
-    char renderTime[20];
     sprintf(renderTime, "render: %5.3fms", time_taken);
     sprintf(imgSize, "%dx%d", frame.cols, frame.rows);
-    printf("%s\n%s %s\r", detect,renderTime,imgSize);
+    printf("%s %s %s\r", detect, renderTime, imgSize);
     
     if (quiet) {
       printf("%12.3f", timeprofile_total_utime(td->tp) / 1.0E3);

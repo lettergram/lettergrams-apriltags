@@ -29,42 +29,115 @@ int main(){
   
   Mat a, b, g, frame;
   
+  /* From apriltag_demo.c */
+  
+  int maxiters = 5;
+  const int hamm_hist_max = 10;
+  int quiet = 0;
+  
+  apriltag_family_t *tf = tag36h11_create();                // Apriltag family 36h11, can change
+  tf->black_border = 1;                                     // Set tag family border size
+  
+  apriltag_detector_t *td = apriltag_detector_create();     // Apriltag detector
+  apriltag_detector_add_family(td, tf);                     // Add apriltag family
+  
+  td->quad_decimate = 1.0;                                  // Decimate input image by factor
+  td->quad_sigma = 0.0;                                     // No blur (I think)
+  td->nthreads = 4;                                         // 4 treads provided
+  td->debug = 0;                                            // No debuging output
+  td->refine_decode = 0;                                    // Don't refine decode
+  td->refine_pose = 0;                                      // Don't refine pose
+  
+  // Output variables
+  char imgSize[20];
+  char renderTime[20];
+  char detect[50];
+  char convertTime[50];
+  char displayString[50];
+  double time_taken = 0.0;
+  
+  /* End of apriltag_demo.c */
+  
   while(1){
     
     clock_t t;
     t = clock();
     
-    cap >> frame; // get a new frame from camera
-    Mat imgLab =  RGB2LAB(frame);
-    t = clock() - t;
-    double time_taken = ((double)t)/CLOCKS_PER_SEC;
-    std::cout << "time to convert: " << time_taken << ", ";
+    cap >> frame;                                           // get a new frame from camera
+    frame =  alphaLAB(RGB2LAB(frame));                      // Returns a channel only
+
+    // determine time to convert
+    time_taken = ((double)(clock() - t))/(CLOCKS_PER_SEC/1000);
+    sprintf(convertTime, "Convert Time: %5.3fms", time_taken);
     
-    a = alphaLAB(imgLab);
-    b = betaLAB(imgLab);
+    pnm_t *pnm = mat2pnm(&frame);
+    image_u8_t *im = pnm_to_image_u8(pnm);                    // Convert pnm to gray image_u8
+    if (im == NULL) {                                         // Error - no image created from pnm
+      std::cout << "Error, not a proper pnm" << std::endl;
+      return -1;
+    }
+
+    /*** Start from origional Apriltags from apriltag_demo.c ***/
     
-    t = clock();
+    int hamm_hist[hamm_hist_max];
+    memset(hamm_hist, 0, sizeof(hamm_hist));
+    zarray_t *detections = apriltag_detector_detect(td, im);
     
-    if(showGradient){
-      g = gradientEdges(a);
-    }else{
-      g = a;
+    for (int i = 0; i < zarray_size(detections); i++) {
+      
+      apriltag_detection_t *det;
+      zarray_get(detections, i, &det);
+      
+      sprintf(detect, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\n",
+              i+1, det->family->d*det->family->d, det->family->h, det->id, det->hamming, det->goodness, det->decision_margin);
+      
+      hamm_hist[det->hamming]++;
+      
+      apriltag_detection_destroy(det);
     }
     
-    pnm_t *pnm = mat2pnm(&g);
-    g = pnm2mat(pnm);
-
+    if(zarray_size(detections) < 1){
+      sprintf(detect, "No tag detected");
+    }
+    
+    zarray_destroy(detections);
+    image_u8_destroy(im);
+    
     t = clock() - t;
-    time_taken = ((double)t)/CLOCKS_PER_SEC;
-    std::cout << "time to find gradient: " << time_taken << ", ";
+    time_taken = ((double)t)/(CLOCKS_PER_SEC/1000);
+    //printf("ms to render: %5.3f\n", time_taken);
     
-    imshow("Display Edges", g);
+    if (!quiet) {
+      //timeprofile_display(td->tp);
+      sprintf(displayString, "fps: %2.2f, nedges: %d, nsegments: %d, nquads: %d\n",1000.0/time_taken,td->nedges,td->nsegments,td->nquads);
+      //std::cout << displayString;
+    }
     
-    if(waitKey(30) >= 0){ break; }
+    //for (int i = 0; i < hamm_hist_max; i++)
+    //printf("%5d", hamm_hist[i]);
 
-    std::cout << std::endl;
+    sprintf(renderTime, "render: %5.3fms", time_taken);
+    sprintf(imgSize, "%dx%d", frame.cols, frame.rows);
+    printf("%s %s %s %s\r", detect, renderTime, convertTime, imgSize);
     
+    if (quiet) {
+      printf("%12.3f", timeprofile_total_utime(td->tp) / 1.0E3);
+    }
+    
+    printf("\n");
+    
+    /*** End of origional Apriltags from apriltag_demo.c ***/
+    
+    putText(frame, displayString, cvPoint(30,30),
+            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
+    imshow("Display Apriltags", frame);
+    
+    if(waitKey(30) >= 0) break;
   }
+  
+  /* deallocate apriltag constructs */
+  apriltag_detector_destroy(td);
+  tag36h11_destroy(tf);
 
   return 0;
 }

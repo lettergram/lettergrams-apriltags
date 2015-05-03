@@ -84,8 +84,11 @@ int main(){
   // Output variables
   char imgSize[20];
   char renderTime[20];
-  char detect[50];
-  char displayString[50];
+  char detectString[50];
+  char convertTime[50];
+  char displayString[120];
+  char outputString[120];
+  double time_taken = 0.0;
   
   /* End of apriltag_demo.c */
   
@@ -114,7 +117,7 @@ int main(){
       apriltag_detection_t *det;
       zarray_get(detections, i, &det);
       
-      sprintf(detect, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\n",
+      sprintf(detectString, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\n",
                i+1, det->family->d*det->family->d, det->family->h, det->id, det->hamming, det->goodness, det->decision_margin);
 
       hamm_hist[det->hamming]++;
@@ -123,7 +126,7 @@ int main(){
     }
     
     if(zarray_size(detections) < 1){
-      sprintf(detect, "No tag detected");
+      sprintf(detectString, "No tag detected");
     }
     
     zarray_destroy(detections);
@@ -135,16 +138,17 @@ int main(){
     
     if (!quiet) {
       //timeprofile_display(td->tp);
-      sprintf(displayString, "fps: %2.2f, nedges: %d, nsegments: %d, nquads: %d\n",1000.0/time_taken,td->nedges,td->nsegments,td->nquads);
+      sprintf(displayString, "fps: %2.2f, nedges: %d, nsegments: %d, nquads: %d",1000.0/time_taken,td->nedges,td->nsegments,td->nquads);
       //std::cout << displayString;
     }
     
     //for (int i = 0; i < hamm_hist_max; i++)
       //printf("%5d", hamm_hist[i]);
     
-    sprintf(renderTime, "render: %5.3fms", time_taken);
+    sprintf(renderTime, "Render: %5.3fms", time_taken);
     sprintf(imgSize, "%dx%d", frame.cols, frame.rows);
-    printf("%s %s %s\r", detect, renderTime, imgSize);
+    sprintf(outputString, "%s %s %s", renderTime, convertTime, imgSize);
+    printf("%s %s\r", detectString, outputString);
     
     if (quiet) {
       printf("%12.3f", timeprofile_total_utime(td->tp) / 1.0E3);
@@ -154,8 +158,18 @@ int main(){
     
     /*** End of origional Apriltags from apriltag_demo.c ***/
     
+    // displays fps, edges, segments, quads
     putText(frame, displayString, cvPoint(30,30),
-            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
+            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
+    
+    // displays render time, convert time, and image size
+    putText(frame, outputString, cvPoint(30,50),
+            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
+    
+    // Displays anny detections (if any)
+    putText(frame, detectString, cvPoint(30,70),
+            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
+    
     imshow("Display Apriltags", frame);
     
     if(waitKey(30) >= 0) break;

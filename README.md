@@ -12,14 +12,14 @@ Our implementation takes most of the code from the origional [Apriltags website]
 2. `mkdir build && cd build`  
 3. `cmake .. && make`  
 
-####Invoke single image
+####Invoke Single Image
 
 $ ./apriltags_demo [options] input_image.pnm
 
 Options: 
 	 -d: Debug, displays image at every step
 
-####To invoke realtime tracking
+####Invoke Realtime Tracking
 
 $ cd build
 

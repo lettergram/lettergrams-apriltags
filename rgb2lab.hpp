@@ -81,6 +81,16 @@ Mat RGB2LAB_alt(Mat const &imgRGB){
   return imgLab;
 }
 
+/**
+ * Takes in a RGB image and outputs
+ * a Lab space image.
+ **/
+Mat RGB2YUV(Mat const &imgRGB){
+  Mat imgYUV;
+  cvtColor(imgRGB, imgYUV, CV_BGR2YCrCb);
+  return imgYUV;
+}
+
 /**                                                                                                 
  * Takes in a RGB image and outputs                                                                 
  * a Lab space image.                                                                               
@@ -88,17 +98,6 @@ Mat RGB2LAB_alt(Mat const &imgRGB){
 Mat RGB2LAB(Mat const &imgRGB){
   Mat imgLab;
   cvtColor(imgRGB, imgLab, CV_BGR2Lab);
-  //imgLab = RGB2LAB_alt(imgRGB);
-  Size s = imgLab.size(); 
-  /*
-  for(int y = 0; y < s.height; y++){
-    for(int x = 0; x < s.width; x++){
-      std::cout << (int)(*imgLab.ptr<Point3_<uchar> >(y,x)).x << ", ";
-      std::cout << (int)(*imgLab.ptr<Point3_<uchar> >(y,x)).y << ", ";
-      std::cout << (int)(*imgLab.ptr<Point3_<uchar> >(y,x)).z << std::endl;
-    }
-  }
-*/
   return imgLab;
 }
 

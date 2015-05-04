@@ -55,6 +55,7 @@ int main(){
   char convertTime[50];
   char displayString[120];
   char outputString[120];
+  char locationString[120];
   double time_taken = 0.0;
   
   /* End of apriltag_demo.c */
@@ -65,7 +66,8 @@ int main(){
     t = clock();
     
     cap >> frame;                                           // get a new frame from camera
-    frame =  alphaLAB(RGB2LAB(frame));                      // Returns a channel only
+    //frame = alphaLAB(RGB2YUV(frame));                       // Just for comparison
+    frame = alphaLAB(RGB2LAB(frame));                       // Returns a channel only
 
     // determine time to convert
     time_taken = ((double)(clock() - t))/(CLOCKS_PER_SEC/1000);
@@ -88,17 +90,24 @@ int main(){
       
       apriltag_detection_t *det;
       zarray_get(detections, i, &det);
-      
+      sprintf(locationString, "Tag Center: (%f,%f)", det->c[0], det->c[1]);
       sprintf(detectString, "detection %2d: id (%2dx%2d)-%-4d, hamming %d, goodness %5.3f, margin %5.3f\n",
               i+1, det->family->d*det->family->d, det->family->h, det->id, det->hamming, det->goodness, det->decision_margin);
       
       hamm_hist[det->hamming]++;
+      
+      // draws a vertical rectangle around tag, not ideal, but easy to implement
+      // det->p[corner][positon], counter clockwise
+      Point pt1 = Point(det->p[0][0], det->p[0][1]);
+      Point pt2 = Point(det->p[2][0], det->p[2][1]);
+      cv::rectangle(frame, pt1, pt2, cvScalar(102,255,0));
       
       apriltag_detection_destroy(det);
     }
     
     if(zarray_size(detections) < 1){
       sprintf(detectString, "No tag detected");
+      sprintf(locationString, "No tag detected");
     }
     
     zarray_destroy(detections);
@@ -115,12 +124,12 @@ int main(){
     }
     
     //for (int i = 0; i < hamm_hist_max; i++)
-    //printf("%5d", hamm_hist[i]);
+      //printf("%5d", hamm_hist[i]);
 
     sprintf(renderTime, "Render: %5.3fms", time_taken);
     sprintf(imgSize, "%dx%d", frame.cols, frame.rows);
     sprintf(outputString, "%s %s %s", renderTime, convertTime, imgSize);
-    printf("%s %s\r", detectString, outputString);
+    printf("%s %s\r", locationString, outputString);
     
     if (quiet) {
       printf("%12.3f", timeprofile_total_utime(td->tp) / 1.0E3);
@@ -138,9 +147,14 @@ int main(){
     putText(frame, outputString, cvPoint(30,50),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
     
-    // Displays anny detections (if any)
+    // Displays any detections (if any)
     putText(frame, detectString, cvPoint(30,70),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
+    
+    
+    // Displays tag location (if any)
+    putText(frame, locationString, cvPoint(30,70),
+            FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     imshow("Display Apriltags", frame);
     

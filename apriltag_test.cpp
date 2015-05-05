@@ -50,17 +50,22 @@
 #include "common/getopt.h"
 
 // Our extensions for chromatags
+#include "rgb2lab.hpp" // functions to convert to rgb to lab, and seperate color channels
 #include "pnm2mat.hpp" // functions to convert pnm to and from mat
-#define ESC char(0x1B)
 
 
 int main(){
+  
+  bool showGradient = false;
+  bool found = false;
 
   VideoCapture cap(0); // open the default camera
+  Size size(854,480);  // size of desired frame origionally 1280x720, 1024x576, 854x480
   if(!cap.isOpened())  // check if camera opened
     return -1;
   
   Mat frame;
+  Mat src;
   
   /* From apriltag_demo.c */
   
@@ -91,6 +96,9 @@ int main(){
   char locationString[120];
   double time_taken = 0.0;
   
+  long double totalFPS = 0.0;
+  double count = 0.0;
+  
   /* End of apriltag_demo.c */
   
   while(1){
@@ -98,8 +106,16 @@ int main(){
     clock_t t;
     t = clock();
     
-    cap >> frame;                                             // Get a new frame from camera
-
+    cap >> src;                                               // Get a new frame from camera
+    if(found){ resize(src,frame,size); }                      // Resize to smaller image if tag found
+    else{ frame = src; }                                      // Keep standard image if no tag
+    
+    if(showGradient){
+      cvtColor(src, frame, CV_BGR2GRAY);
+      cvtColor(frame, frame, CV_GRAY2RGB);
+      frame = gradientEdges(frame);                               // Show gradient for fun
+    }
+    
     pnm_t *pnm = mat2pnm(&frame);                             // Convert Mat fram to pnm
     image_u8_t *im = pnm_to_image_u8(pnm);                    // Convert pnm to gray image_u8
     if (im == NULL) {                                         // Error - no image created from pnm
@@ -133,8 +149,11 @@ int main(){
     }
     
     if(zarray_size(detections) < 1){
+      found = false;
       sprintf(detectString, "No tag detected");
       sprintf(locationString, "No tag detected");
+    }else{
+      found = false;
     }
     
     zarray_destroy(detections);
@@ -146,7 +165,13 @@ int main(){
     
     if (!quiet) {
       //timeprofile_display(td->tp);
-      sprintf(displayString, "fps: %2.2f, nedges: %d, nsegments: %d, nquads: %d",1000.0/time_taken,td->nedges,td->nsegments,td->nquads);
+      totalFPS += (1000.0/time_taken);
+      count += 1.0;
+      if(count > 30000.0){
+        totalFPS = 0.0;
+        count = 0.0;
+      }
+      sprintf(displayString, "fps: %2.2Lf, nquads: %d",totalFPS/count, td->nquads);
       //std::cout << displayString;
     }
     
@@ -179,7 +204,7 @@ int main(){
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     // Displays tag location (if any)
-    putText(frame, locationString, cvPoint(30,70),
+    putText(frame, locationString, cvPoint(30,90),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     imshow("Display Apriltags", frame);

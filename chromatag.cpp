@@ -22,12 +22,14 @@
 int main(){
 
   bool showGradient = false;
+  bool found = false;
   
   VideoCapture cap(0); // open the default camera
+  Size size(854,480);  // size of desired frame origionally 1280x720, 1024x576, 854x480
   if(!cap.isOpened())  // check if camera opened
     return -1;
   
-  Mat a, b, g, frame;
+  Mat a, b, g, frame, src;
   
   /* From apriltag_demo.c */
   
@@ -58,6 +60,9 @@ int main(){
   char locationString[120];
   double time_taken = 0.0;
   
+  long double totalFPS = 0.0;
+  double count = 0.0;
+  
   /* End of apriltag_demo.c */
   
   while(1){
@@ -65,13 +70,24 @@ int main(){
     clock_t t;
     t = clock();
     
-    cap >> frame;                                           // get a new frame from camera
-    //frame = alphaLAB(RGB2YUV(frame));                       // Just for comparison
-    frame = alphaLAB(RGB2LAB(frame));                       // Returns a channel only
-
+    cap >> src;                                               // Get a new frame from camera
+    if(found){
+      resize(src,frame,size);                                 // Resize to smaller image if tag found
+      //resize(frame, src, size);
+    }else{ frame = src; }                                     // Keep standard image if no tag
+    //frame = RGB2YUV(frame);                                 // Just for comparison
+    frame = RGB2LAB(frame);                                   // Returns lab space
+    frame = alphaLAB(frame);                                  // Look at only a channel
+    
+    if(showGradient){
+      src = gradientEdges(frame);                               // Show gradient for fun
+    }
+    
     // determine time to convert
     time_taken = ((double)(clock() - t))/(CLOCKS_PER_SEC/1000);
     sprintf(convertTime, "Convert Time: %5.3fms", time_taken);
+    
+    t = clock();
     
     pnm_t *pnm = mat2pnm(&frame);
     image_u8_t *im = pnm_to_image_u8(pnm);                    // Convert pnm to gray image_u8
@@ -100,14 +116,17 @@ int main(){
       // det->p[corner][positon], counter clockwise
       Point pt1 = Point(det->p[0][0], det->p[0][1]);
       Point pt2 = Point(det->p[2][0], det->p[2][1]);
-      cv::rectangle(frame, pt1, pt2, cvScalar(102,255,0));
+      cv::rectangle(src, pt1, pt2, cvScalar(102,255,0));
       
       apriltag_detection_destroy(det);
     }
     
     if(zarray_size(detections) < 1){
+      found = false;
       sprintf(detectString, "No tag detected");
       sprintf(locationString, "No tag detected");
+    }else{
+      found = true;
     }
     
     zarray_destroy(detections);
@@ -119,7 +138,13 @@ int main(){
     
     if (!quiet) {
       //timeprofile_display(td->tp);
-      sprintf(displayString, "fps: %2.2f, nedges: %d, nsegments: %d, nquads: %d",1000.0/time_taken,td->nedges,td->nsegments,td->nquads);
+      totalFPS += (1000.0/time_taken);
+      count += 1.0;
+      if(count > 30000.0){
+        totalFPS = 0.0;
+        count = 0.0;
+      }
+      sprintf(displayString, "fps: %2.2Lf, nquads: %d",totalFPS/count, td->nquads);
       //std::cout << displayString;
     }
     
@@ -140,23 +165,23 @@ int main(){
     /*** End of origional Apriltags from apriltag_demo.c ***/
     
     // displays fps, edges, segments, quads
-    putText(frame, displayString, cvPoint(30,30),
+    putText(src, displayString, cvPoint(30,30),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
     
     // displays render time, convert time, and image size
-    putText(frame, outputString, cvPoint(30,50),
+    putText(src, outputString, cvPoint(30,50),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
     
     // Displays any detections (if any)
-    putText(frame, detectString, cvPoint(30,70),
+    putText(src, detectString, cvPoint(30,70),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(200,200,250), 1, CV_AA);
     
     
     // Displays tag location (if any)
-    putText(frame, locationString, cvPoint(30,70),
+    putText(src, locationString, cvPoint(30,90),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
-    imshow("Display Apriltags", frame);
+    imshow("Display Apriltags", src);
     
     if(waitKey(30) >= 0) break;
   }

@@ -101,53 +101,6 @@ Mat RGB2LAB(Mat const &imgRGB){
   return imgLab;
 }
 
-
-/**
- * Takes in image in the lab space and splits 
- * out the alpha stream. Returning it as a matrix,
- * to be saved out to file or manipulated
- **/
-Mat alphaLAB(Mat const &imgLab){
-
-  //Mat alphaLab(imgLab.size().height, imgLab.size().width, CV_8UC3); // may not work
-  Mat alphaLab(imgLab);
-  //cvtColor(imgLab, alphaLab, CV_Lab2RGB);
-  Size s = alphaLab.size();
-
-  int steps = imgLab.step;
-  int channels = imgLab.channels();
-
-  for(int y = 0; y < s.height; y++){
-    for(int x = 0; x < s.width; x++){
-      (*alphaLab.ptr<Point3_<uchar> >(y,x)).x = imgLab.data[steps*y + channels*x + 1];
-      (*alphaLab.ptr<Point3_<uchar> >(y,x)).y = imgLab.data[steps*y + channels*x + 1];
-      (*alphaLab.ptr<Point3_<uchar> >(y,x)).z = imgLab.data[steps*y + channels*x + 1];
-    }
-  }
-  return alphaLab;
-}
-
-/**
- * Takes in image in the lab space and splits 
- * out the beta stream. Returning it as a matrix,
- * to be saved out to file or manipulated
- **/
-Mat betaLAB(Mat &imgLab){
-  Mat betaLab(imgLab);
-  //cvtColor(imgLab, betaLab, CV_Lab2RGB);
-  Size s = betaLab.size();
-  int steps = imgLab.step;
-  int channels = imgLab.channels();
-  for(int y = 0; y < s.height; y++){
-    for(int x = 0; x < s.width; x++){
-      (*betaLab.ptr<Point3_<uchar> >(y,x)).x = imgLab.data[steps*y + channels*x + 2];
-      (*betaLab.ptr<Point3_<uchar> >(y,x)).y = imgLab.data[steps*y + channels*x + 2];
-      (*betaLab.ptr<Point3_<uchar> >(y,x)).z = imgLab.data[steps*y + channels*x + 2];
-    }
-  }
-  return betaLab;
-}
-
 /**
  * Finds the gradient via the sobel method,
  * the output is a Mat with the gradient edges (might be better as array).
@@ -178,6 +131,50 @@ Mat gradientEdges(Mat &img){
   
   return gradImg;
   
+}
+
+void unsharpMask(cv::Mat& im){
+  cv::Mat tmp;
+  cv::GaussianBlur(im, tmp, cv::Size(5,5), 5);
+  cv::addWeighted(im, 1.5, tmp, -0.5, 0, im);
+}
+
+/**
+ * Takes in image in the lab space and splits 
+ * out the alpha stream. Returning it as a matrix,
+ * to be saved out to file or manipulated
+ **/
+Mat alphaLAB(Mat const &imgLab){
+
+  Mat alphaLab(imgLab);
+  
+  vector<Mat> channels(3);
+  split(imgLab, channels);
+  
+  cvtColor(channels[1], alphaLab, CV_GRAY2RGB);
+  
+  unsharpMask(alphaLab);
+  
+  return alphaLab;
+}
+
+/**
+ * Takes in image in the lab space and splits 
+ * out the beta stream. Returning it as a matrix,
+ * to be saved out to file or manipulated
+ **/
+Mat betaLAB(Mat &imgLab){
+  
+  Mat betaLab(imgLab);
+  
+  vector<Mat> channels(3);
+  split(imgLab, channels);
+  
+  cvtColor(channels[2], betaLab, CV_GRAY2RGB);
+  
+  unsharpMask(betaLab);
+
+  return betaLab;
 }
 
 /**

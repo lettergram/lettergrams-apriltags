@@ -21,11 +21,13 @@
 
 int main(){
 
-  bool showGradient = false;
+  bool showGradient = true;
   bool found = false;
+  int w = 854;
+  int h = 480;
   
   VideoCapture cap(0); // open the default camera
-  Size size(854,480);  // size of desired frame origionally 1280x720, 1024x576, 854x480
+  Size size(w,h);  // size of desired frame origionally 1280x720, 1024x576, 854x480
   if(!cap.isOpened())  // check if camera opened
     return -1;
   
@@ -74,13 +76,17 @@ int main(){
     if(found){
       resize(src,frame,size);                                 // Resize to smaller image if tag found
       //resize(frame, src, size);
-    }else{ frame = src; }                                     // Keep standard image if no tag
+    }else{
+      frame = src;                                            // Keep standard image if no tag
+    }
     //frame = RGB2YUV(frame);                                 // Just for comparison
     frame = RGB2LAB(frame);                                   // Returns lab space
     frame = alphaLAB(frame);                                  // Look at only a channel
+
+    resize(frame,src,src.size());
     
     if(showGradient){
-      src = gradientEdges(frame);                               // Show gradient for fun
+      src = gradientEdges(src);                               // Show gradient for fun
     }
     
     // determine time to convert
@@ -116,6 +122,13 @@ int main(){
       // det->p[corner][positon], counter clockwise
       Point pt1 = Point(det->p[0][0], det->p[0][1]);
       Point pt2 = Point(det->p[2][0], det->p[2][1]);
+      
+      // If tag found flag, scale to image size
+      if(found){
+        Size s = src.size();
+        pt1 = Point((det->p[0][0]/w) * s.width, (det->p[0][1]/h) * s.height);
+        pt2 = Point((det->p[2][0]/w) * s.width, (det->p[2][1]/h) * s.height);
+      }
       cv::rectangle(src, pt1, pt2, cvScalar(102,255,0));
       
       apriltag_detection_destroy(det);
@@ -140,7 +153,7 @@ int main(){
       //timeprofile_display(td->tp);
       totalFPS += (1000.0/time_taken);
       count += 1.0;
-      if(count > 30000.0){
+      if(count > 150.0){
         totalFPS = 0.0;
         count = 0.0;
       }

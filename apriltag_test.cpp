@@ -56,7 +56,7 @@
 
 int main(){
   
-  bool showGradient = false;
+  bool showGradient = true;
   bool found = false;
 
   VideoCapture cap(0); // open the default camera
@@ -113,7 +113,9 @@ int main(){
     if(showGradient){
       cvtColor(src, frame, CV_BGR2GRAY);
       cvtColor(frame, frame, CV_GRAY2RGB);
-      frame = gradientEdges(frame);                               // Show gradient for fun
+      src = gradientEdges(frame);                               // Show gradient for fun
+    }else{
+      cvtColor(src, src, CV_BGR2GRAY);
     }
     
     pnm_t *pnm = mat2pnm(&frame);                             // Convert Mat fram to pnm
@@ -143,7 +145,7 @@ int main(){
       // det->p[corner][positon], counter clockwise
       Point pt1 = Point(det->p[0][0], det->p[0][1]);
       Point pt2 = Point(det->p[2][0], det->p[2][1]);
-      cv::rectangle(frame, pt1, pt2, cvScalar(102,255,0));
+      cv::rectangle(src, pt1, pt2, cvScalar(102,255,0));
       
       apriltag_detection_destroy(det);
     }
@@ -192,22 +194,22 @@ int main(){
     /*** End of origional Apriltags from apriltag_demo.c ***/
     
     // displays fps, edges, segments, quads
-    putText(frame, displayString, cvPoint(30,30),
+    putText(src, displayString, cvPoint(30,30),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     // displays render time, convert time, and image size
-    putText(frame, outputString, cvPoint(30,50),
+    putText(src, outputString, cvPoint(30,50),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     // Displays any detections (if any)
-    putText(frame, detectString, cvPoint(30,70),
+    putText(src, detectString, cvPoint(30,70),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
     // Displays tag location (if any)
-    putText(frame, locationString, cvPoint(30,90),
+    putText(src, locationString, cvPoint(30,90),
             FONT_HERSHEY_COMPLEX_SMALL, 0.8, cvScalar(150,150,250), 1, CV_AA);
     
-    imshow("Display Apriltags", frame);
+    imshow("Display Apriltags", src);
     
     if(waitKey(30) >= 0) break;
   }
